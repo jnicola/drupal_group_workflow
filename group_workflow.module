@@ -101,6 +101,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
 
   // Check whether the item is new or not by trying to load NID.
   if ($nid = $form_state->getFormObject()->getEntity()->id()) {
+
     // Load all the group content for this node.
     $group_contents = \Drupal::entityTypeManager()
       ->getStorage('group_content')
@@ -108,30 +109,11 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
         'type' => array_keys($group_content_types),
         'entity_id' => $nid,
       ]);
-  }
-  else {
-    $current_uri = \Drupal::service('path.current')->getPath();
-    // See if we have a group URL.
-    if(strpos($current_uri, 'create/group_node') == -1) {
+
+    // Don't bother if there are no groups returned.
+    if(empty($group_contents)){
       return;
     }
-      $current_uri = explode('/', $current_uri);
-      $current_group = $current_uri[2];
-
-      // @TODO: Verify this logic... Used above identically but uses NID?
-      $group_contents = \Drupal::entityTypeManager()
-        ->getStorage('group_content')
-        ->loadByProperties([
-          'type' => array_keys($group_content_types),
-          'entity_id' => $current_group,
-        ]);
-      return;
-    }
-
-    // If the node does not belong to any group, we have nothing to say.
-    if (empty($group_contents)) {
-      return;
-  }
 
     // Load all groups specifically.
     $groups = [];
@@ -139,6 +121,31 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
       /** @var \Drupal\group\Entity\GroupContentInterface $group_content */
       $group = $group_content->getGroup();
       $groups[$group->id()] = $group;
+    }
+
+  }
+  else {
+    // Get Group from the current URL, return if no param.
+    $current_uri = \Drupal::service('path.current')->getPath();
+    if(strpos($current_uri, 'create/group_node') == -1) {
+      return;
+    }
+
+    $current_uri = explode('/', $current_uri);
+    $current_group = $current_uri[2];
+
+    $groups = [];
+    $groups[] = \Drupal::entityTypeManager()
+      ->getStorage('group')
+      ->loadByProperties([
+        'id' => intval($current_group),
+      ]);
+    }
+
+    // If there is no group despite a param, exxit
+    if (empty($group)) {
+    // @TODO: Throw an error?
+      return;
     }
 
     // Check if user has permission for all groups.
@@ -154,12 +161,10 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
       }
     }
 
-    // Hide fields if the user does not have permission to view fields.
+    // Hide workflow fields if user doesn't have group perms in all groups.
     if(!$permission_pass){
-      dpm('HIDE FIELDS!');
+      // @TODO: Find and remove all workflow fields.
     }
-
-  //unset($form['field_workflow']);
 }
 
 /**
