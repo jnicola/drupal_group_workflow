@@ -13,6 +13,12 @@ use Drupal\group\Entity\GroupContentType;
  * and user lacks appropriate group permissions.
  */
 function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  // Check is user can bypass group access controls, in which case skip.
+  $user = \Drupal::currentUser();
+  if ($user->hasPermission('bypass group access')) {
+    return;
+  }
+
   // Determine if this content type is even managed by groups at all.
   $groupPluginManager = \Drupal::service('plugin.manager.group_content_enabler');
   $plugin_id = 'group_node:' . $form_state->getFormObject()->getEntity()->bundle();
@@ -90,7 +96,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
   }
 
   // Hide workflow container if user doesn't have group perms in all groups.
-  if (!$permission_pass || 1 == 1) {
+  if (!$permission_pass) {
     foreach ($form as &$array_item) {
       if (is_array($array_item)
         && isset($array_item['#type'])
