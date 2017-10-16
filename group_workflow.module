@@ -1,89 +1,18 @@
 <?php
-
 /**
- * @FILE:
+ * @file
+ * Module contianing hooks and basic helper functions for Group Workflow.
  */
 
 use Drupal\group\Entity\GroupContentType;
-use Drupal\Core\Session\AccountInterface;
-
-//function group_workflow_field_widget_form_alter(&$element, \Drupal\Core\Form\FormStateInterface $form_state, $context){
-//
-//  return;
-//  // Make sure that we're dealing with a workflow element.
-//  if(isset($element['#title']) && is_string($element['#title']) && $element['#title'] == 'Workflow'){
-//
-//    // Determine if this content type is even managed by groups at all.
-//    $groupPluginManager = \Drupal::service('plugin.manager.group_content_enabler');
-//    $plugin_id = 'group_node:' . $form_state->getFormObject()->getEntity()->bundle();
-//    $group_content_types = GroupContentType::loadByContentPluginId($plugin_id);
-//
-//    // Do nothing if this content type is unrelated to groups.
-//    if (empty($group_content_types)) {
-//      dpm('No group content types detected.');
-//      return;
-//    }
-//
-//    // Check whether the item is new or not by trying to load NID.
-//    if ($nid = $form_state->getFormObject()->getEntity()->id()) {
-//      // Load all the group content for this node.
-//      $group_contents = \Drupal::entityTypeManager()
-//        ->getStorage('group_content')
-//        ->loadByProperties([
-//          'type' => array_keys($group_content_types),
-//          'entity_id' => $nid,
-//        ]);
-//
-//      // If the node does not belong to any group, we have nothing to say.
-//      if (empty($group_contents)) {
-//        dpm('Node is not in a group.');
-//        return;
-//      }
-//
-//      dpm('Entity is in a group!');
-//
-//      $groups = [];
-//      foreach ($group_contents as $group_content) {
-//        /** @var \Drupal\group\Entity\GroupContentInterface $group_content */
-//        $group = $group_content->getGroup();
-//        $groups[$group->id()] = $group;
-//      }
-//
-//      // Check if user has permission for all groups.
-//      $account = Drupal::currentUser();
-//      $permission_pass = NULL;
-//
-//      foreach($groups as $group) {
-//        if ($group->hasPermission('access group_node workflow', $account)) {
-//          $permission_pass = TRUE;
-//        }
-//        else {
-//          $permission_pass = FALSE;
-//        }
-//      }
-//
-//      // @TODO: Remove this test configuration.
-//      $permission_pass = FALSE;
-//
-//      if (!$permission_pass) {
-//        // @TODO: Hide the workflow form entirely.
-//        $element['#disabled'] = TRUE;
-//      }
-//      dpm($element);
-//    }
-//    else {
-//      dpm('NEW node!');
-//    }
-//  }
-//}
 
 /**
- * @TODO: Document.
+ * Implements hook_form_alter().
  *
- * PURPOSE: Modify node forms so as any workflow fields are hidden if user does
- * not possess group permission to alter the field
+ * PURPOSE: For node edit forms, remove workflow fields if related to group
+ * and user lacks appropriate group permissions.
  */
-function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id){
+function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
   // Determine if this content type is even managed by groups at all.
   $groupPluginManager = \Drupal::service('plugin.manager.group_content_enabler');
   $plugin_id = 'group_node:' . $form_state->getFormObject()->getEntity()->bundle();
@@ -111,7 +40,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
       ]);
 
     // Don't bother if there are no groups returned.
-    if(empty($group_contents)){
+    if (empty($group_contents)) {
       return;
     }
 
@@ -127,7 +56,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
   else {
     // Get Group from the current URL, return if no param.
     $current_uri = \Drupal::service('path.current')->getPath();
-    if(strpos($current_uri, 'create/group_node') == -1) {
+    if (strpos($current_uri, 'create/group_node') == -1) {
       return;
     }
 
@@ -140,38 +69,52 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
       ->loadByProperties([
         'id' => intval($current_group),
       ]);
+  }
+
+  // If there is no group despite a param, exit.
+  if (empty($group)) {
+    return;
+  }
+
+  // Check if user has permission for all groups.
+  $account = Drupal::currentUser();
+  $permission_pass = NULL;
+
+  foreach ($groups as $group) {
+    if ($group->hasPermission('access group_node workflow', $account)) {
+      $permission_pass = TRUE;
     }
-
-    // If there is no group despite a param, exxit
-    if (empty($group)) {
-    // @TODO: Throw an error?
-      return;
+    else {
+      $permission_pass = FALSE;
     }
+  }
 
-    // Check if user has permission for all groups.
-    $account = Drupal::currentUser();
-    $permission_pass = NULL;
-
-    foreach($groups as $group) {
-      if ($group->hasPermission('access group_node workflow', $account)) {
-        $permission_pass = TRUE;
+  // Hide workflow container if user doesn't have group perms in all groups.
+  if (!$permission_pass || 1 == 1) {
+    foreach ($form as &$array_item) {
+      if (is_array($array_item)
+        && isset($array_item['#type'])
+        && $array_item['#type'] == 'container'
+        && isset($array_item['widget'][0]['workflow_transition'])
+      ) {
+        $array_item['#disabled'] = TRUE;
       }
-      else {
-        $permission_pass = FALSE;
-      }
     }
-
-    // Hide workflow fields if user doesn't have group perms in all groups.
-    if(!$permission_pass){
-      // @TODO: Find and remove all workflow fields.
-    }
+  }
 }
 
 /**
  * Helper function to find if a key exists.
+ *
+ * @param array $array
+ *   An array to recurse through.
+ * @param string $keySearch
+ *   A value to search for.
+ *
+ * @return bool
+ *   Returns TRUE if value exists, FALSE if not.
  */
-function _group_workflow_find_workflow_transition_parent_key_exists($array, $keySearch)
-{
+function _group_workflow_find_workflow_transition_parent_key_exists(array $array, $keySearch) {
   foreach ($array as $key => $item) {
     if ($key == $keySearch) {
       return TRUE;
@@ -180,9 +123,10 @@ function _group_workflow_find_workflow_transition_parent_key_exists($array, $key
       if (is_array($item)
         && _group_workflow_find_workflow_transition_parent_key_exists(
           $item, $keySearch)
-      ){
+      ) {
         return TRUE;
       }
     }
   }
+  return FALSE;
 }
