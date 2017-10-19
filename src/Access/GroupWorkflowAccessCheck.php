@@ -15,6 +15,12 @@ class GroupWorkflowAccessCheck implements AccessInterface {
   /**
    * Custom access check for workflow tab on group nodes.
    *
+   * NOTE: Per the drupal.org documentation at
+   * https://www.drupal.org/docs/8/api/routing-system/access-checking-on-routes
+   * this must return "allowed" for situations where you would expect "neutral"
+   * to be the correct response, as routing uses "andIf" logic, while entity
+   * uses "orIf".
+   *
    * @param \Drupal\Core\Session\AccountInterface $account
    *   Run access checks for this account.
    *
@@ -22,16 +28,16 @@ class GroupWorkflowAccessCheck implements AccessInterface {
    *   Returns Allowed, neutral or not allowed.
    */
   public function access(AccountInterface $account) {
-    // Load relevant entity
+    // Load relevant entity.
     $entity = workflow_url_get_entity();
 
-    // Determine if this content type is even managed by groups at all
+    // Determine if this content type is even managed by groups at all.
     $groupPluginManager = \Drupal::service('plugin.manager.group_content_enabler');
     $plugin_id = 'group_node:' . $entity->bundle();
     $group_content_types = GroupContentType::loadByContentPluginId($plugin_id);
 
     if (empty($group_content_types)) {
-      return AccessResult::neutral();
+      return AccessResult::allowed();
     }
 
     // Load all the group content for this node.
@@ -44,7 +50,7 @@ class GroupWorkflowAccessCheck implements AccessInterface {
 
     // If the node does not belong to any group, we have nothing to say.
     if (empty($group_contents)) {
-      return AccessResult::neutral();
+      return AccessResult::allowed();
     }
 
     $groups = [];
@@ -57,10 +63,11 @@ class GroupWorkflowAccessCheck implements AccessInterface {
     // Check if user has permission for all groups.
     $permission_pass = NULL;
 
-    foreach($groups as $group){
-      if($group->hasPermission('access group_node workflow', $account)){
+    foreach ($groups as $group) {
+      if ($group->hasPermission('access group_node workflow', $account)) {
         $permission_pass = TRUE;
-      }else{
+      }
+      else {
         $permission_pass = FALSE;
       }
     }
@@ -68,4 +75,5 @@ class GroupWorkflowAccessCheck implements AccessInterface {
     return $permission_pass ?
       AccessResult::allowed() : AccessResult::forbidden();
   }
+
 }

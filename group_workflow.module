@@ -7,7 +7,7 @@
 use Drupal\group\Entity\GroupContentType;
 
 /**
- * Implements hook_form_alter().
+ * Implements hook_form_BASE_FORM_ID_alter().
  *
  * PURPOSE: For node edit forms, remove workflow fields if related to group
  * and user lacks appropriate group permissions.
@@ -67,10 +67,10 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
     }
 
     $current_uri = explode('/', $current_uri);
-    $current_group = $current_uri[2];
+    $current_group = intval($current_uri[2]);
 
     $groups = [];
-    $groups[] = \Drupal::entityTypeManager()
+    $groups = \Drupal::entityTypeManager()
       ->getStorage('group')
       ->loadByProperties([
         'id' => intval($current_group),
@@ -78,7 +78,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
   }
 
   // If there is no group despite a param, exit.
-  if (empty($group)) {
+  if (empty($groups)) {
     return;
   }
 
