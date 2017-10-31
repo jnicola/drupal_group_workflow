@@ -62,7 +62,7 @@ function group_workflow_form_node_form_alter(&$form, \Drupal\Core\Form\FormState
   else {
     // Get Group from the current URL, return if no param.
     $current_uri = \Drupal::service('path.current')->getPath();
-    if (strpos($current_uri, 'create/group_node') == -1) {
+    if (strpos($current_uri, 'create/group_node') === FALSE) {
       return;
     }
 
